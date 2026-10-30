@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Activity – party board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF3FF; --surface:#FFFFFF; --surface2:#F5F7FF; --ink:#1D1F4A; --muted:#5B5F8A; --line:#C9D3F2;
+  --explain:#2F7DF6; --mime:#F2542D; --draw:#F5B700; --start:#2BB673; --finish:#9B5DE5;
+  --shadow:0 6px 0 rgba(29,31,74,.12);
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#151838; --surface:#21264F; --surface2:#1A1E44; --ink:#F2F3FF; --muted:#A8ACD6; --line:#343B72;
+    --shadow:0 6px 0 rgba(0,0,0,.35); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#151838; --surface:#21264F; --surface2:#1A1E44; --ink:#F2F3FF; --muted:#A8ACD6; --line:#343B72;
+  --shadow:0 6px 0 rgba(0,0,0,.35); color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Fredoka","Trebuchet MS",system-ui,sans-serif;font-size:17px;line-height:1.35;min-height:100%}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--explain);outline-offset:2px}
+
+/* header */
+header{display:flex;align-items:center;gap:16px;padding:14px 22px;flex-wrap:wrap}
+.logo{display:flex;gap:3px;font-weight:700;font-size:30px;letter-spacing:.5px}
+.logo span{display:inline-block;padding:0 3px;border-radius:8px;color:#fff}
+.logo span:nth-child(3n+1){background:var(--explain);transform:rotate(-4deg)}
+.logo span:nth-child(3n+2){background:var(--mime);transform:rotate(3deg)}
+.logo span:nth-child(3n){background:var(--draw);color:#1D1F4A;transform:rotate(-2deg)}
+nav{display:flex;gap:6px;background:var(--surface);padding:5px;border-radius:999px;box-shadow:var(--shadow)}
+nav a{padding:7px 16px;border-radius:999px;text-decoration:none;color:var(--muted);font-weight:600}
+nav a[aria-current="page"]{background:var(--ink);color:var(--bg)}
+.spacer{flex:1}
+.btn{border:0;border-radius:14px;padding:10px 18px;font-weight:600;background:var(--surface);box-shadow:var(--shadow)}
+.btn:active{transform:translateY(3px);box-shadow:0 3px 0 rgba(29,31,74,.12)}
+.btn.primary{background:var(--ink);color:var(--bg)}
+.btn.big{font-size:22px;padding:14px 22px;width:100%}
+
+/* game layout */
+#game{display:grid;grid-template-columns:1fr 300px;gap:20px;padding:0 22px 22px}
+@media (max-width:900px){#game{grid-template-columns:1fr}}
+.board-wrap{background:var(--surface);border-radius:28px;padding:18px;box-shadow:var(--shadow);overflow-x:auto}
+.board{position:relative;display:grid;grid-template-columns:repeat(9,minmax(58px,1fr));gap:14px;min-width:620px}
+.board svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.tile{position:relative;z-index:1;aspect-ratio:1;border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:600;box-shadow:inset 0 -6px 0 rgba(0,0,0,.15);transition:transform .12s}
+.tile .ico{font-size:clamp(18px,2.4vw,30px);line-height:1}
+.tile .lbl{font-size:clamp(9px,.95vw,13px);opacity:.95;margin-top:2px}
+.tile .num{position:absolute;top:4px;left:8px;font-size:11px;opacity:.8}
+.tile.explain{background:var(--explain)}
+.tile.mime{background:var(--mime)}
+.tile.draw{background:var(--draw);color:#1D1F4A}
+.tile.start{background:var(--start)}
+.tile.finish{background:var(--finish)}
+.tile.hover{transform:scale(1.08);outline:4px dashed var(--ink);outline-offset:2px}
+.tokens{position:absolute;inset:auto 4px 4px 4px;display:flex;flex-wrap:wrap;gap:3px;justify-content:center}
+.token{width:clamp(18px,2vw,26px);height:clamp(18px,2vw,26px);border-radius:50% 50% 50% 50%/60% 60% 40% 40%;border:3px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.35);cursor:grab;touch-action:none}
+.token.active{animation:bob 1s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-4px)}}
+.ghost{position:fixed;z-index:999;pointer-events:none;width:38px;height:38px;transform:translate(-50%,-50%) scale(1.1)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;color:var(--muted);font-size:15px}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:5px;vertical-align:-2px;margin-right:6px}
+
+aside{display:flex;flex-direction:column;gap:16px}
+.panel{background:var(--surface);border-radius:24px;padding:18px;box-shadow:var(--shadow)}
+.turn{font-size:26px;font-weight:700;display:flex;align-items:center;gap:10px}
+.turn .dot{width:26px;height:26px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.3)}
+.turn-sub{color:var(--muted);margin:4px 0 14px}
+.team{display:flex;align-items:center;gap:8px;padding:8px;border-radius:14px}
+.team.current{background:var(--surface2)}
+.team .dot{width:18px;height:18px;border-radius:50%;flex:none}
+.team .name{flex:1;font-weight:600;background:none;border:0;text-align:left;padding:0}
+.team .pos{color:var(--muted);font-size:14px;min-width:54px;text-align:right}
+.step{border:0;background:var(--surface2);border-radius:10px;width:32px;height:32px;font-weight:700}
+.hint{color:var(--muted);font-size:14px;margin:10px 0 0}
+
+/* dialogs */
+dialog{border:0;border-radius:28px;padding:0;background:var(--surface);color:var(--ink);width:min(560px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(21,24,56,.6)}
+.dlg-body{padding:24px}
+.dlg-head{padding:20px 24px;color:#fff;font-size:28px;font-weight:700;display:flex;align-items:center;gap:12px;border-radius:28px 28px 0 0}
+.dlg-head.draw{color:#1D1F4A}
+.dlg-head.explain{background:var(--explain)} .dlg-head.mime{background:var(--mime)} .dlg-head.draw{background:var(--draw)}
+.dlg-head small{display:block;font-size:15px;font-weight:500;opacity:.9}
+.row{display:flex;align-items:center;gap:10px}
+.stepper{display:flex;align-items:center;gap:14px;font-size:32px;font-weight:700}
+.stepper button{width:48px;height:48px;border-radius:50%;border:0;background:var(--surface2);font-size:26px;font-weight:700}
+.names{display:grid;gap:8px;margin:18px 0}
+.names label{display:flex;align-items:center;gap:10px}
+.names input{flex:1;font:inherit;border:2px solid var(--line);background:var(--surface2);color:var(--ink);border-radius:12px;padding:8px 12px}
+
+/* playing card */
+.card{background:var(--surface);border-radius:26px;box-shadow:var(--shadow);border:3px solid var(--line);overflow:hidden}
+.card-top{display:flex;justify-content:center;gap:6px;padding:12px;background:var(--surface2);font-size:24px}
+.terms{display:grid}
+.term{display:flex;align-items:center;gap:16px;padding:16px 20px;border-top:2px dashed var(--line)}
+.pts{flex:none;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font-size:24px;font-weight:700;color:#fff}
+.pts.p3{background:var(--start)} .pts.p4{background:var(--explain)} .pts.p5{background:var(--mime)}
+.term .w{font-size:26px;font-weight:600}
+.term .lv{font-size:13px;color:var(--muted)}
+.hidden .w{filter:blur(10px);user-select:none}
+.timer{display:flex;align-items:center;gap:14px;margin:18px 0}
+.timer .t{font-size:44px;font-weight:700;font-variant-numeric:tabular-nums;min-width:90px}
+.timer .t.low{color:var(--mime)}
+.bar{flex:1;height:14px;background:var(--surface2);border-radius:999px;overflow:hidden}
+.bar div{height:100%;background:var(--start);transition:width 1s linear}
+.result{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.result .btn{background:var(--start);color:#fff}
+.result .btn:nth-child(2){background:var(--explain)} .result .btn:nth-child(3){background:var(--mime)}
+.fail{margin-top:8px;width:100%}
+
+/* cards deck view */
+#cards{padding:0 22px 30px;max-width:640px;margin:0 auto}
+.deck-bar{display:flex;align-items:center;gap:10px;margin:6px 0 16px;flex-wrap:wrap}
+.deck-count{flex:1;color:var(--muted);font-weight:600}
+.deck-nav{display:flex;gap:12px;margin-top:18px}
+.deck-nav .btn{flex:1;font-size:20px}
+#deckCard{touch-action:pan-y}
+.cats{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;color:var(--muted);margin-top:16px;font-size:15px}
+
+.win{text-align:center}
+.win .big{font-size:64px}
+@media (prefers-reduced-motion:reduce){.token.active{animation:none}.bar div{transition:none}}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo" aria-label="Activity"><span>A</span><span>c</span><span>t</span><span>i</span><span>v</span><span>i</span><span>t</span><span>y</span></div>
+  <nav>
+    <a href="#game" id="navGame">Board</a>
+    <a href="#cards" id="navCards">Cards</a>
+  </nav>
+  <div class="spacer"></div>
+  <button class="btn" id="newGameBtn">New game</button>
+</header>
+
+<main id="game">
+  <div>
+    <div class="board-wrap"><div class="board" id="board"></div></div>
+    <div class="legend">
+      <span><i style="background:var(--explain)"></i>💬 Explain</span>
+      <span><i style="background:var(--mime)"></i>🎭 Pantomime</span>
+      <span><i style="background:var(--draw)"></i>✏️ Draw</span>
+      <span>Drag a piece onto any field to move it.</span>
+    </div>
+  </div>
+  <aside>
+    <div class="panel">
+      <div class="turn"><span class="dot" id="turnDot"></span><span id="turnName"></span></div>
+      <p class="turn-sub" id="turnSub"></p>
+      <button class="btn primary big" id="drawBtn">Draw a card</button>
+    </div>
+    <div class="panel">
+      <div id="teamList"></div>
+      <p class="hint">Tap a team name to give them the turn. Use the arrows to fix a position.</p>
+    </div>
+  </aside>
+</main>
+
+<main id="cards" hidden>
+  <div class="deck-bar">
+    <span class="deck-count" id="deckCount"></span>
+    <button class="btn" id="toggleHide">Hide terms</button>
+    <button class="btn" id="shuffleBtn">Shuffle</button>
+  </div>
+  <div id="deckCard"></div>
+  <div class="deck-nav">
+    <button class="btn" id="prevBtn" aria-label="Previous card">‹ Previous</button>
+    <button class="btn primary" id="nextBtn" aria-label="Next card">Next ›</button>
+  </div>
+  <div class="cats"><span>🟢 3 points: easy</span><span>🔵 4 points: medium</span><span>🔴 5 points: hard</span></div>
+</main>
+
+<!-- setup -->
+<dialog id="setupDlg">
+  <div class="dlg-body">
+    <h2 style="margin:0 0 6px;font-size:30px">How many teams?</h2>
+    <div class="stepper"><button id="minusT" aria-label="Fewer teams">–</button><span id="tCount">3</span><button id="plusT" aria-label="More teams">+</button></div>
+    <div class="names" id="nameList"></div>
+    <button class="btn primary big" id="startBtn">Start game</button>
+  </div>
+</dialog>
+
+<!-- card turn -->
+<dialog id="cardDlg">
+  <div class="dlg-head" id="cardHead"></div>
+  <div class="dlg-body">
+    <div class="card hidden" id="turnCard"></div>
+    <button class="btn fail" id="revealBtn" style="margin-top:12px">Show terms (performer only)</button>
+    <div class="timer">
+      <span class="t" id="timeLeft">60</span>
+      <div class="bar"><div id="timeBar" style="width:100%"></div></div>
+      <button class="btn" id="timerBtn">Start timer</button>
+    </div>
+    <div class="result">
+      <button class="btn" data-pts="3">Guessed +3</button>
+      <button class="btn" data-pts="4">Guessed +4</button>
+      <button class="btn" data-pts="5">Guessed +5</button>
+    </div>
+    <button class="btn fail" id="failBtn">Not guessed</button>
+  </div>
+</dialog>
+
+<dialog id="winDlg">
+  <div class="dlg-body win">
+    <div class="big">🏆</div>
+    <h2 id="winText" style="font-size:32px;margin:8px 0 18px"></h2>
+    <button class="btn primary big" id="againBtn">Play again</button>
+  </div>
+</dialog>
+
+<script>
+const EASY=["Banana","Dog","Pizza","Sun","Car","Football","Guitar","Rain","Birthday","Tree","Phone","Cat","Ice cream","Book","Swimming","Teeth","Snowman","Bicycle","Airplane","Rainbow","Chair","Apple","Horse","Toothbrush","Clock","Fish","Shoes","Moon","Coffee","Sleeping","Door","Hat","Egg","Train","Bed","Cake","Flower","Pencil","Window","Elephant","Kite","Umbrella","Spoon","Glasses","Mountain","Boat","Candle","Bread","Monkey","Dancing","Rocket","Heart","Key","Duck","Lamp","Christmas tree","Pirate","Robot","Snake","Crying"];
+const MEDIUM=["Lighthouse","Volcano","Hairdresser","Traffic jam","Roller coaster","Wedding","Selfie","Vampire","Camping","Dentist","Yoga","Skateboard","Fire extinguisher","Jellyfish","Magician","Treasure map","Hot air balloon","Microwave","Karaoke","Escalator","Parachute","Scarecrow","Haunted house","Waiter","Popcorn","Lawn mower","Penguin","Sunburn","Hiccups","Vacuum cleaner","Ski jump","Astronaut","Cactus","Bubble bath","Detective","Sushi","Thunderstorm","Tattoo","Referee","Mermaid","Igloo","Ferris wheel","Zombie","Chess","Bungee jumping","Wi-Fi","Barbecue","Sleepwalking","Spider web","Time machine","Windmill","Superhero","Flat tyre","Lottery","Car wash","Sandcastle","Firefighter","Nightmare","Avalanche","Photo booth"];
+const HARD=["Procrastination","Déjà vu","Inflation","Gravity","Jealousy","Democracy","Midlife crisis","Photosynthesis","Black hole","Supply chain","Nostalgia","Stock market crash","Jet lag","Butterfly effect","Customer hotline","Influencer","Global warming","Speed dating","Hangover","Artificial intelligence","Imposter syndrome","Freedom of speech","Insomnia","Evolution","Cryptocurrency","Peer pressure","Long-distance relationship","Brainstorming","Small talk","Overtime","Daylight saving time","Echo","Silent disco","Group project","Fake news","Retirement","Elevator pitch","Bucket list","Gossip","Recycling","Autocorrect","Self-checkout","Ventriloquist","Mindfulness","Monday morning","Reverse parking","Sarcasm","First impression","Blind date","Escape room","Plot twist","Inheritance","Compound interest","Writer’s block","Time zone","Awkward silence","Return policy","Terms and conditions","Second-hand embarrassment","Out of office"];
+
+const TYPES={explain:{ico:"💬",name:"Explain",verb:"Explain it without saying the word."},mime:{ico:"🎭",name:"Pantomime",verb:"Act it out. No sounds, no words."},draw:{ico:"✏️",name:"Draw",verb:"Draw it. No letters, no numbers."}};
+const COLORS=["#E63946","#3A86FF","#2BB673","#FF9F1C","#9B5DE5","#00BBF9","#F15BB5","#4A4E69"];
+const COLS=9, ROWS=5, N=COLS*ROWS;
+const KEY="activity-game-v1";
+
+const $=s=>document.querySelector(s);
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+
+function buildDeck(){const e=shuffle(EASY),m=shuffle(MEDIUM),h=shuffle(HARD);const n=Math.min(e.length,m.length,h.length);return Array.from({length:n},(_,i)=>[e[i],m[i],h[i]])}
+function buildBoard(){
+  const b=["start"];
+  while(b.length<N-1){
+    const r=Math.random(); let t=r<.4?"explain":r<.8?"mime":"draw";
+    if(b.length>=2&&b[b.length-1]===t&&b[b.length-2]===t)continue;
+    if(t==="draw"&&b[b.length-1]==="draw")continue;
+    b.push(t);
+  }
+  b.push("finish"); return b;
+}
+
+let S=null;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function load(){try{const v=localStorage.getItem(KEY);if(v)S=JSON.parse(v)}catch(e){S=null}}
+
+/* ---------- board ---------- */
+function cellPos(i){const r=Math.floor(i/COLS);const c=r%2===0?i%COLS:COLS-1-i%COLS;return{r:r+1,c:c+1}}
+function renderBoard(){
+  const el=$("#board"); el.innerHTML='<svg aria-hidden="true"><polyline id="track" fill="none" stroke="var(--line)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  S.board.forEach((t,i)=>{
+    const d=document.createElement("div"); d.className="tile "+t; d.dataset.i=i;
+    const p=cellPos(i); d.style.gridRow=p.r; d.style.gridColumn=p.c;
+    if(t==="start") d.innerHTML='<span class="ico">🚩</span><span class="lbl">Start</span>';
+    else if(t==="finish") d.innerHTML='<span class="ico">🏁</span><span class="lbl">Finish</span>';
+    else d.innerHTML=`<span class="num">${i}</span><span class="ico">${TYPES[t].ico}</span><span class="lbl">${TYPES[t].name}</span>`;
+    const tk=document.createElement("div"); tk.className="tokens"; d.appendChild(tk);
+    el.appendChild(d);
+  });
+  S.teams.forEach((tm,ti)=>{
+    const tok=document.createElement("div"); tok.className="token"+(ti===S.turn?" active":"");
+    tok.style.background=tm.color; tok.title=tm.name; tok.dataset.team=ti;
+    tok.addEventListener("pointerdown",startDrag);
+    el.querySelector(`.tile[data-i="${tm.pos}"] .tokens`).appendChild(tok);
+  });
+  requestAnimationFrame(drawTrack);
+}
+function drawTrack(){
+  const b=$("#board"); if(!b) return; const br=b.getBoundingClientRect();
+  const pts=[...b.querySelectorAll(".tile")].sort((a,c)=>a.dataset.i-c.dataset.i).map(t=>{const r=t.getBoundingClientRect();return `${r.left-br.left+r.width/2},${r.top-br.top+r.height/2}`});
+  const tr=$("#track"); if(tr) tr.setAttribute("points",pts.join(" "));
+}
+new ResizeObserver(drawTrack).observe(document.documentElement);
+
+/* drag pieces */
+let drag=null;
+function startDrag(e){
+  e.preventDefault();
+  const tok=e.currentTarget; const g=tok.cloneNode(); g.classList.add("ghost"); g.classList.remove("active");
+  g.style.left=e.clientX+"px"; g.style.top=e.clientY+"px"; document.body.appendChild(g);
+  drag={team:+tok.dataset.team,ghost:g,over:null}; tok.style.opacity=.3;
+  window.addEventListener("pointermove",moveDrag); window.addEventListener("pointerup",endDrag,{once:true});
+}
+function moveDrag(e){
+  drag.ghost.style.left=e.clientX+"px"; drag.ghost.style.top=e.clientY+"px";
+  const t=document.elementFromPoint(e.clientX,e.clientY)?.closest(".tile");
+  if(drag.over&&drag.over!==t) drag.over.classList.remove("hover");
+  if(t){t.classList.add("hover"); drag.over=t}
+}
+function endDrag(e){
+  window.removeEventListener("pointermove",moveDrag);
+  const t=document.elementFromPoint(e.clientX,e.clientY)?.closest(".tile");
+  drag.ghost.remove();
+  if(t) setPos(drag.team,+t.dataset.i); else render();
+  drag=null;
+}
+function setPos(ti,p){
+  S.teams[ti].pos=Math.max(0,Math.min(N-1,p)); save(); render();
+  if(S.teams[ti].pos===N-1) showWin(ti);
+}
+
+/* side panel */
+function render(){
+  renderBoard();
+  const tm=S.teams[S.turn];
+  $("#turnDot").style.background=tm.color;
+  $("#turnName").textContent=`${tm.name}’s turn`;
+  const ft=S.board[tm.pos];
+  $("#turnSub").textContent = TYPES[ft] ? `Standing on ${TYPES[ft].ico} ${TYPES[ft].name}` : "Standing on Start: any activity goes.";
+  const list=$("#teamList"); list.innerHTML="";
+  S.teams.forEach((t,i)=>{
+    const r=document.createElement("div"); r.className="team"+(i===S.turn?" current":"");
+    r.innerHTML=`<span class="dot" style="background:${t.color}"></span><button class="name">${t.name}</button><span class="pos">${t.pos===0?"Start":t.pos===N-1?"Finish":"Field "+t.pos}</span><button class="step" aria-label="Move ${t.name} back">‹</button><button class="step" aria-label="Move ${t.name} forward">›</button>`;
+    r.querySelector(".name").onclick=()=>{S.turn=i;save();render()};
+    const st=r.querySelectorAll(".step"); st[0].onclick=()=>setPos(i,t.pos-1); st[1].onclick=()=>setPos(i,t.pos+1);
+    list.appendChild(r);
+  });
+}
+
+/* setup */
+let tCount=3;
+function renderNames(){
+  const prev=[...document.querySelectorAll("#nameList input")].map(i=>i.value);
+  $("#tCount").textContent=tCount; const l=$("#nameList"); l.innerHTML="";
+  for(let i=0;i<tCount;i++){
+    l.insertAdjacentHTML("beforeend",`<label><span class="token" style="background:${COLORS[i]};cursor:default"></span><input value="${prev[i]??"Team "+(i+1)}" aria-label="Name of team ${i+1}" maxlength="18"></label>`);
+  }
+}
+$("#minusT").onclick=()=>{tCount=Math.max(2,tCount-1);renderNames()};
+$("#plusT").onclick=()=>{tCount=Math.min(8,tCount+1);renderNames()};
+$("#startBtn").onclick=()=>{
+  const names=[...document.querySelectorAll("#nameList input")].map((x,i)=>x.value.trim()||"Team "+(i+1));
+  S={teams:names.map((n,i)=>({name:n,color:COLORS[i],pos:0})),board:buildBoard(),turn:Math.random()*names.length|0,deck:buildDeck(),di:0};
+  save(); $("#setupDlg").close(); render();
+};
+$("#newGameBtn").onclick=()=>{location.hash="#game";renderNames();$("#setupDlg").showModal()};
+
+/* turn card */
+let timer=null,left=60,curType="explain";
+function nextCard(){if(S.di>=S.deck.length){S.deck=buildDeck();S.di=0}return S.deck[S.di++]}
+function cardHTML(c){
+  const lv=["Easy","Medium","Hard"];
+  return `<div class="card-top"><span>💬</span><span>🎭</span><span>✏️</span></div><div class="terms">${c.map((w,k)=>`<div class="term"><span class="pts p${k+3}">${k+3}</span><div><div class="lv">${lv[k]}</div><div class="w">${w}</div></div></div>`).join("")}</div>`;
+}
+$("#drawBtn").onclick=()=>{
+  const tm=S.teams[S.turn]; let t=S.board[tm.pos];
+  if(!TYPES[t]) t=["explain","mime","draw"][Math.random()*3|0];
+  curType=t;
+  const h=$("#cardHead"); h.className="dlg-head "+t;
+  h.innerHTML=`<span>${TYPES[t].ico}</span><div>${TYPES[t].name}<small>${tm.name}: ${TYPES[t].verb}</small></div>`;
+  const c=$("#turnCard"); c.innerHTML=cardHTML(nextCard()); c.classList.add("hidden");
+  $("#revealBtn").textContent="Show terms (performer only)";
+  resetTimer(); save(); $("#cardDlg").showModal();
+};
+$("#revealBtn").onclick=()=>{const c=$("#turnCard");c.classList.toggle("hidden");$("#revealBtn").textContent=c.classList.contains("hidden")?"Show terms (performer only)":"Hide terms"};
+function resetTimer(){clearInterval(timer);timer=null;left=60;paintTimer();$("#timerBtn").textContent="Start timer"}
+function paintTimer(){$("#timeLeft").textContent=left;$("#timeLeft").classList.toggle("low",left<=10);$("#timeBar").style.width=(left/60*100)+"%"}
+function beep(){try{const a=new AudioContext(),o=a.createOscillator(),g=a.createGain();o.frequency.value=660;o.connect(g);g.connect(a.destination);g.gain.setValueAtTime(.3,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+.8);o.start();o.stop(a.currentTime+.8)}catch(e){}}
+$("#timerBtn").onclick=()=>{
+  if(timer){clearInterval(timer);timer=null;$("#timerBtn").textContent="Resume";return}
+  if(left<=0) left=60;
+  $("#timerBtn").textContent="Pause";
+  timer=setInterval(()=>{left--;paintTimer();if(left<=0){clearInterval(timer);timer=null;$("#timerBtn").textContent="Restart";beep()}},1000);
+};
+function endTurn(pts){
+  resetTimer(); $("#cardDlg").close();
+  const ti=S.turn;
+  S.turn=(S.turn+1)%S.teams.length;
+  if(pts) setPos(ti,S.teams[ti].pos+pts); else {save();render()}
+}
+document.querySelectorAll(".result .btn").forEach(b=>b.onclick=()=>endTurn(+b.dataset.pts));
+$("#failBtn").onclick=()=>endTurn(0);
+$("#cardDlg").addEventListener("close",()=>resetTimer());
+
+function showWin(ti){$("#winText").textContent=`${S.teams[ti].name} wins!`;$("#winDlg").showModal()}
+$("#againBtn").onclick=()=>{$("#winDlg").close();renderNames();$("#setupDlg").showModal()};
+
+/* deck view */
+let deck=buildDeck(),dIdx=0,hideTerms=false;
+function renderDeck(){
+  $("#deckCount").textContent=`Card ${dIdx+1} of ${deck.length}`;
+  const c=$("#deckCard"); c.innerHTML=`<div class="card${hideTerms?" hidden":""}">${cardHTML(deck[dIdx])}</div>`;
+  $("#toggleHide").textContent=hideTerms?"Show terms":"Hide terms";
+}
+$("#prevBtn").onclick=()=>{dIdx=(dIdx-1+deck.length)%deck.length;renderDeck()};
+$("#nextBtn").onclick=()=>{dIdx=(dIdx+1)%deck.length;renderDeck()};
+$("#shuffleBtn").onclick=()=>{deck=buildDeck();dIdx=0;renderDeck()};
+$("#toggleHide").onclick=()=>{hideTerms=!hideTerms;renderDeck()};
+document.addEventListener("keydown",e=>{
+  if($("#cards").hidden||document.querySelector("dialog[open]")) return;
+  if(e.key==="ArrowRight") $("#nextBtn").click();
+  if(e.key==="ArrowLeft") $("#prevBtn").click();
+});
+let sx=null;
+$("#deckCard").addEventListener("pointerdown",e=>sx=e.clientX);
+$("#deckCard").addEventListener("pointerup",e=>{if(sx===null)return;const dx=e.clientX-sx;sx=null;if(dx<-50)$("#nextBtn").click();if(dx>50)$("#prevBtn").click()});
+
+/* routing */
+function route(){
+  const cards=location.hash==="#cards";
+  $("#game").hidden=cards; $("#cards").hidden=!cards;
+  $("#navGame").toggleAttribute("aria-current",!cards); $("#navCards").toggleAttribute("aria-current",cards);
+  if(cards){$("#navCards").setAttribute("aria-current","page");renderDeck()} else {$("#navGame").setAttribute("aria-current","page");if(S)requestAnimationFrame(drawTrack)}
+}
+window.addEventListener("hashchange",route);
+
+load();
+if(!S||!S.teams){renderNames();$("#setupDlg").showModal();S={teams:[{name:"Team 1",color:COLORS[0],pos:0}],board:buildBoard(),turn:0,deck:buildDeck(),di:0};}
+render(); route();
+</script>
+</body>
+</html>
